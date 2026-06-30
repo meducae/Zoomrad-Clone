@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:zoomradclone/presentation/auth/PasswordScreen.dart';
 
 import '../../utils/themes/app_colors.dart';
 import '../../utils/themes/app_text_stile.dart';
 import '../../utils/themes/app_texts.dart';
 import '../../utils/themes/theme_menager.dart';
+import 'bloc/auth_bloc.dart';
+import 'bloc/auth_event.dart';
+import 'bloc/auth_state.dart';
 
 
 class VerificationScreen extends StatefulWidget {
@@ -106,12 +110,40 @@ class _VerificationScreenState extends State<VerificationScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is VerifyOtpLoading) {
+            _showLoadingDialog(context);
+          } else if (state is VerifyOtpSuccess) {
+            Navigator.pop(context); // pop loading dialog
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PasswordScreen(themeManager: widget.themeManager),
+              ),
+            );
+          } else if (state is VerifyOtpFailure) {
+            Navigator.pop(context); // pop loading dialog
+            _showErrorDialog(context, state.error);
+          } else if (state is SendOtpLoading) {
+            _showLoadingDialog(context);
+          } else if (state is SendOtpSuccess) {
+            Navigator.pop(context); // pop loading dialog
+            _startTimer(); // reset the timer
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Kod muvaffaqiyatli yuborildi')),
+            );
+          } else if (state is SendOtpFailure) {
+            Navigator.pop(context); // pop loading dialog
+            _showErrorDialog(context, state.error);
+          }
+        },
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Container(
                 width: 60,
                 height: 60,
@@ -204,10 +236,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _lang('resend_code'),
-                    style: AppTextStyles.body.copyWith(
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  GestureDetector(
+                    onTap: _canResendCode
+                        ? () {
+                            context.read<AuthBloc>().add(SendOtpRequested(widget.phoneNumber));
+                          }
+                        : null,
+                    child: Text(
+                      _lang('resend_code'),
+                      style: AppTextStyles.body.copyWith(
+                        color: _canResendCode
+                            ? const Color(0xFF109C5B)
+                            : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        fontWeight: _canResendCode ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -217,7 +260,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     ),
                     child: Text(
                       _formatTime(_secondsRemaining),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
                     ),
                   ),
                 ],
@@ -235,14 +281,15 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         : (isDark ? AppColors.darkDisabledButton : AppColors.lightDisabledButton),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: _isButtonEnabled ? () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PasswordScreen(themeManager: widget.themeManager),
-                      ),
-                    );
-                  } : null,
+                  onPressed: _isButtonEnabled
+                      ? () {
+                          final otpCode = _controllers.map((c) => c.text).join();
+                          context.read<AuthBloc>().add(VerifyOtpRequested(
+                                phone: widget.phoneNumber,
+                                otp: otpCode,
+                              ));
+                        }
+                      : null,
                   child: Text(
                     _lang('verify_button'),
                     style: AppTextStyles.button.copyWith(color: Colors.white),
@@ -252,6 +299,36 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ],
           ),
         ),
+      ),
+    ),
+  );
+}
+
+  void _showLoadingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF109C5B),
+        ),
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xatolik'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Color(0xFF109C5B))),
+          ),
+        ],
       ),
     );
   }
