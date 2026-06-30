@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:zoomradclone/presentation/auth/PasswordScreen.dart';
 
 import '../../utils/themes/app_colors.dart';
 import '../../utils/themes/app_text_stile.dart';
@@ -235,11 +236,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: _isButtonEnabled ? () {
-
-                    // Navigator.pushReplacement(
-                    //   context,
-                    //   MaterialPageRoute(builder: (context) => const NextScreen()),
-                    // );
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PasswordScreen(themeManager: widget.themeManager),
+                      ),
+                    );
                   } : null,
                   child: Text(
                     _lang('verify_button'),
