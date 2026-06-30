@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 import '../../utils/themes/app_colors.dart';
@@ -6,6 +7,9 @@ import '../../utils/themes/app_text_stile.dart';
 import '../../utils/themes/app_texts.dart';
 import '../../utils/themes/theme_menager.dart';
 import 'VerificationScreen.dart';
+import 'bloc/auth_bloc.dart';
+import 'bloc/auth_event.dart';
+import 'bloc/auth_state.dart';
 
 
 class PhoneEntryScreen extends StatefulWidget {
@@ -64,11 +68,31 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is SendOtpLoading) {
+            _showLoadingDialog(context);
+          } else if (state is SendOtpSuccess) {
+            Navigator.pop(context); // pop loading
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VerificationScreen(
+                  themeManager: widget.themeManager,
+                  phoneNumber: state.phone,
+                ),
+              ),
+            );
+          } else if (state is SendOtpFailure) {
+            Navigator.pop(context); // pop loading
+            _showErrorDialog(context, state.error);
+          }
+        },
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 60,
@@ -139,8 +163,9 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showLanguageBottomSheet(BuildContext context) {
     showModalBottomSheet(
@@ -233,16 +258,8 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                   ),
                   onPressed: () {
                     Navigator.pop(context);
-
-                     Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VerificationScreen(
-                          themeManager: widget.themeManager,
-                          phoneNumber: _phoneController.text,
-                        ),
-                      ),
-                    );
+                    final cleanPhone = _phoneController.text.replaceAll(RegExp(r'[\s()-]'), '');
+                    context.read<AuthBloc>().add(SendOtpRequested(cleanPhone));
                   },
                   child: Text(_lang('yes'), style: const TextStyle(color: Colors.white)),
                 ),
@@ -252,4 +269,34 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
         );
       },
     );
-  }}
+  }
+
+  void _showLoadingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF109C5B),
+        ),
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Xatolik'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Color(0xFF109C5B))),
+          ),
+        ],
+      ),
+    );
+  }
+}
